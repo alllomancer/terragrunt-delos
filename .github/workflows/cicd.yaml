@@ -1,0 +1,109 @@
+---
+name: Continues Deploy TG to AWS
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+env:
+  AWS_REGION: us-east-1
+
+  TERRAFORM_VERSION: "1.3.7"
+  TERRAGRUNT_VERSION: "0.42.5"
+jobs:
+  cd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[AWS] Configure credentials"
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: "[Setup] Terraform"
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: "[Setup] Terragrunt"
+        uses: autero1/action-terragrunt@v1.1.0
+        with:
+          terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v37
+        with:
+          dir_names: "true"
+          files: |
+            !.github
+
+      - name: List all changed files
+        shell: bash
+        run: |
+          count=0
+          for dir in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "$dir was changed"
+            count=$(( $count + 1 ))
+          done
+          if [ "$count" -gt 1 ]; then
+            echo "only 1 folder can be changed at a time"
+            exit 1
+          fi
+
+      - name: terragrunt Plan
+        if: github.event_name == 'pull_request'
+        id: plan
+        working-directory: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          terragrunt run-all plan --terragrunt-non-interactive -no-color >> /__w/terragrunt-config-dev/terragrunt-config-dev/plan.txt 2>&1
+        continue-on-error: true
+
+      - name: read output
+        if: github.event_name == 'pull_request'
+        id: output
+        run: |
+          echo 'PLAN<<EOF' >> $GITHUB_OUTPUT
+          cat /__w/terragrunt-config-dev/terragrunt-config-dev/plan.txt >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Update Pull Request
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terragrunt\n${{join(steps.output.outputs.PLAN, '\n')}}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Commit: \`${{ github.sha }}\`, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: terragrunt Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        working-directory: ${{ steps.changed-files.outputs.all_changed_files }}
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        run: terragrunt run-all apply --terragrunt-non-interactive
