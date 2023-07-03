@@ -1,4 +1,4 @@
-name: "demo"
-container_name: "demo"
+name: "demo1"
+container_name: "demo1"
 container_port: 80
 cluster_rds_instance_type: "db.r6g.2xlarge"
