@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "!.github"
   pull_request:
 env:
   AWS_REGION: us-east-1
@@ -61,7 +63,7 @@ jobs:
         id: plan
         working-directory: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          terragrunt run-all plan --terragrunt-non-interactive -no-color >> /__w/terragrunt-config-dev/terragrunt-config-dev/plan.txt 2>&1
+          terragrunt run-all plan --terragrunt-non-interactive -no-color >> /__w/terragrunt-delos/terragrunt-delos/plan.txt 2>&1
         continue-on-error: true
 
       - name: read output
@@ -69,7 +71,7 @@ jobs:
         id: output
         run: |
           echo 'PLAN<<EOF' >> $GITHUB_OUTPUT
-          cat /__w/terragrunt-config-dev/terragrunt-config-dev/plan.txt >> $GITHUB_OUTPUT
+          cat /__w/terragrunt-delos/terragrunt-delos/plan.txt >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Update Pull Request
