@@ -43,7 +43,7 @@ jobs:
         with:
           dir_names: "true"
           files: |
-            !.github
+            !.github/**
 
       - name: List all changed files
         shell: bash
