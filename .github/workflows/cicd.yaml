@@ -43,7 +43,7 @@ jobs:
         with:
           dir_names: "true"
           files: |
-            !.github
+            !.github/**
 
       - name: List all changed files
         shell: bash
@@ -63,15 +63,16 @@ jobs:
         id: plan
         working-directory: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          terragrunt run-all plan --terragrunt-non-interactive -no-color >> /__w/terragrunt-delos/terragrunt-delos/plan.txt 2>&1
+          terragrunt run-all plan --terragrunt-non-interactive -no-color >> ./plan.txt 2>&1
         continue-on-error: true
 
       - name: read output
         if: github.event_name == 'pull_request'
+        working-directory: ${{ steps.changed-files.outputs.all_changed_files }}
         id: output
         run: |
           echo 'PLAN<<EOF' >> $GITHUB_OUTPUT
-          cat /__w/terragrunt-delos/terragrunt-delos/plan.txt >> $GITHUB_OUTPUT
+          cat ./plan.txt >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Update Pull Request
